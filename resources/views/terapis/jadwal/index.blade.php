@@ -2,7 +2,7 @@
 
 @section('title', 'Jadwal Saya')
 @section('page_title', 'Jadwal Saya')
-@section('page_subtitle', 'Jadwal dibuat otomatis oleh sistem. Anda mengonfirmasi sesi yang sudah selesai.')
+@section('page_subtitle', 'Jadwal dibuat otomatis oleh sistem. Anda hanya dapat melihatnya.')
 
 @section('content')
 <div class="row g-4">
@@ -28,20 +28,10 @@
                             <td>{{ $r->tanggal_praktik->translatedFormat('D, d M Y') }}</td>
                             <td>{{ $r->jam }}</td>
                             <td class="table-order-id">#{{ $r->nomor_antrean }}</td>
-                            <td>{{ $r->pasien->user->nama_lengkap }}</td>
-                            <td>{{ $r->paket->nama_paket }}</td>
+                            <td>{{ ($r->pasien?->user?->nama_lengkap ?? '-') }}</td>
+                            <td>{{ ($r->paket?->nama_paket ?? '-') }}</td>
                             <td>@include('partials.spark.status-badge', ['status' => $r->status_antrean])</td>
-                            <td>
-                                <div class="d-flex justify-content-center gap-1">
-                                    <a href="{{ route('terapis.jadwal.show', $r) }}" class="table-btn-action" title="Detail"><i class="bi bi-eye"></i></a>
-                                    @if (in_array($r->status_antrean, ['terjadwal', 'berlangsung']) && ! $r->tanggal_praktik->isFuture())
-                                        <form action="{{ route('terapis.jadwal.selesai', $r) }}" method="POST" data-confirm="Tandai sesi ini selesai?">
-                                            @csrf @method('PATCH')
-                                            <button type="submit" class="table-btn-action" title="Tandai selesai"><i class="bi bi-check2-circle"></i></button>
-                                        </form>
-                                    @endif
-                                </div>
-                            </td>
+                            <td class="text-center"><a href="{{ route('terapis.jadwal.show', $r) }}" class="table-btn-action" title="Detail"><i class="bi bi-eye"></i></a></td>
                         </tr>
                     @empty
                         <tr><td colspan="7" class="text-center text-muted py-4">Belum ada pasien terjadwal.</td></tr>

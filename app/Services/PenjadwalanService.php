@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\JadwalPraktikTerapis;
 use App\Models\PaketLayanan;
 use App\Models\Pasien;
+use App\Models\Terapis;
 use App\Models\ReservasiAntrean;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -61,16 +62,17 @@ class PenjadwalanService
     }
 
     /**
-     * Mencari jam & terapis untuk satu tanggal. Tidak menyimpan apa pun.
+     * Slot paling awal milik tiap terapis yang bisa melayani pada tanggal itu (satu opsi per terapis),
+     * diurutkan dari jam paling awal, lalu beban paling ringan. Opsi pertama = pilihan otomatis sistem.
      *
-     * @return array{tanggal: Carbon, jam_mulai: string, jam_selesai: string, terapis_id: int, terapis: \App\Models\Terapis}|null
+     * @return array<int, array{tanggal: Carbon, jam_mulai: string, jam_selesai: string, terapis_id: int, terapis: Terapis}>
      */
-    public function cariSlotPadaTanggal(PaketLayanan $paket, ?Pasien $pasien, Carbon $tanggal, bool $kunci = false): ?array
+    public function daftarSlotPadaTanggal(PaketLayanan $paket, ?Pasien $pasien, Carbon $tanggal, bool $kunci = false): array
     {
         $tanggal = $tanggal->copy()->startOfDay();
 
         if (! $this->tanggalDalamRentang($tanggal)) {
-            return null;
+            return [];
         }
 
         $durasi = (int) $paket->durasi_menit;
@@ -84,7 +86,7 @@ class PenjadwalanService
             ->get();
 
         if ($jadwalHariIni->isEmpty()) {
-            return null;
+            return [];
         }
 
         $milikPasien = $pasien
@@ -144,29 +146,48 @@ class PenjadwalanService
             }
         }
 
-        if (! $kandidat) {
-            return null;
-        }
-
         usort($kandidat, fn ($a, $b) => [$a['urut'], $a['beban'], $a['terapis_id']] <=> [$b['urut'], $b['beban'], $b['terapis_id']]);
 
-        return $kandidat[0];
+        // satu opsi per terapis (yang paling awal)
+        $hasil = [];
+        foreach ($kandidat as $k) {
+            $hasil[$k['terapis_id']] ??= $k;
+        }
+
+        return array_values($hasil);
+    }
+
+    /** Pilihan otomatis sistem untuk satu tanggal (opsi pertama), atau null bila tidak ada terapis. */
+    public function cariSlotPadaTanggal(PaketLayanan $paket, ?Pasien $pasien, Carbon $tanggal, bool $kunci = false): ?array
+    {
+        return $this->daftarSlotPadaTanggal($paket, $pasien, $tanggal, $kunci)[0] ?? null;
     }
 
     /**
-     * Membuat reservasi + nomor antrean secara atomik untuk tanggal pilihan pasien.
+     * Membuat reservasi + nomor antrean secara atomik.
      *
-     * @throws RuntimeException bila tidak ada terapis yang bisa melayani pada tanggal itu
+     * @param  int|null  $terapisId  terapis pilihan pasien; null = pilihan otomatis sistem
+     *
+     * @throws RuntimeException bila tidak ada terapis yang bisa melayani
      */
-    public function buatReservasi(Pasien $pasien, PaketLayanan $paket, Carbon $tanggal): ReservasiAntrean
+    public function buatReservasi(Pasien $pasien, PaketLayanan $paket, Carbon $tanggal, ?int $terapisId = null): ReservasiAntrean
     {
-        return DB::transaction(function () use ($pasien, $paket, $tanggal) {
-            // dihitung ulang di dalam transaksi: slot yang tadi tampil bisa saja sudah diambil pasien lain
-            $slot = $this->cariSlotPadaTanggal($paket, $pasien, $tanggal, kunci: true);
+        return DB::transaction(function () use ($pasien, $paket, $tanggal, $terapisId) {
+            // Cegah dua sesi bertabrakan: semua permintaan untuk terapis & pasien yang sama diantrekan di sini,
+            // sehingga pengecekan bentrok di bawah selalu melihat reservasi terbaru.
+            $this->kunciBaris($pasien, $tanggal);
+
+            $daftar = $this->daftarSlotPadaTanggal($paket, $pasien, $tanggal, kunci: true);
+
+            $slot = $terapisId
+                ? collect($daftar)->firstWhere('terapis_id', $terapisId)
+                : ($daftar[0] ?? null);
 
             if (! $slot) {
                 throw new RuntimeException(
-                    'Tidak ada terapis yang tersedia pada '.$tanggal->translatedFormat('l, d F Y').'. Silakan pilih tanggal lain.'
+                    $terapisId && $daftar
+                        ? 'Terapis yang Anda pilih sudah tidak tersedia pada tanggal ini. Silakan pilih terapis atau tanggal lain.'
+                        : 'Tidak ada terapis yang tersedia pada '.$tanggal->translatedFormat('l, d F Y').'. Silakan pilih tanggal lain.'
                 );
             }
 
@@ -183,9 +204,26 @@ class PenjadwalanService
                 'jam_mulai' => $slot['jam_mulai'],
                 'jam_selesai' => $slot['jam_selesai'],
                 'nomor_antrean' => $nomor + 1,
-                'status_antrean' => 'menunggu_pembayaran',
+                'status_antrean' => 'terjadwal',
             ]);
         });
+    }
+
+    /**
+     * Mengunci baris terapis (urut id, supaya tidak deadlock) lalu baris pasien.
+     * Harus dipanggil di dalam transaksi.
+     */
+    protected function kunciBaris(Pasien $pasien, Carbon $tanggal): void
+    {
+        $hari = JadwalPraktikTerapis::HARI[$tanggal->dayOfWeekIso - 1];
+
+        $ids = JadwalPraktikTerapis::where('hari', $hari)->pluck('terapis_id')->unique()->sort()->values();
+
+        if ($ids->isNotEmpty()) {
+            Terapis::whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get(['id']);
+        }
+
+        Pasien::whereKey($pasien->id)->lockForUpdate()->first(['id']);
     }
 
     protected function reservasiAktif(Carbon $tanggal, string $kolom, int $id, bool $kunci): Collection

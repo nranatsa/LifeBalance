@@ -9,7 +9,7 @@
     @php
         $kartu = [
             ['Antrean Hari Ini', $stat['antrean_hari_ini'], 'bi-list-ol'],
-            ['Pembayaran Menunggu', $stat['pembayaran_pending'], 'bi-hourglass-split'],
+            ['Sesi Belum Dibayar', $stat['belum_dibayar'], 'bi-hourglass-split'],
             ['Pendapatan Bulan Ini', 'Rp '.number_format($stat['pendapatan_bulan_ini'], 0, ',', '.'), 'bi-cash-coin'],
             ['Pasien Terdaftar', $stat['pasien'], 'bi-people'],
             ['Terapis Aktif', $stat['terapis'], 'bi-person-heart'],
@@ -41,9 +41,9 @@
                         <tr>
                             <td class="table-order-id">#{{ $r->nomor_antrean }}</td>
                             <td>{{ $r->jam }}</td>
-                            <td>{{ $r->pasien->user->nama_lengkap }}</td>
-                            <td>{{ $r->paket->nama_paket }}</td>
-                            <td>{{ $r->terapis->user->nama_lengkap }}</td>
+                            <td>{{ ($r->pasien?->user?->nama_lengkap ?? '-') }}</td>
+                            <td>{{ ($r->paket?->nama_paket ?? '-') }}</td>
+                            <td>{{ ($r->terapis?->user?->nama_lengkap ?? '-') }}</td>
                             <td>@include('partials.spark.status-badge', ['status' => $r->status_antrean])</td>
                         </tr>
                     @empty
@@ -58,16 +58,16 @@
     <div class="col-xl-4">
         <div class="card border-light shadow-sm p-4 h-100">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="card-title mb-0">Perlu Diverifikasi</h5>
-                <a href="{{ route('admin.pembayaran.index', ['status' => 'pending']) }}" class="small">Lihat semua</a>
+                <h5 class="card-title mb-0">Sesi Selesai, Belum Dibayar</h5>
+                <a href="{{ route('admin.pembayaran.create') }}" class="small">Catat pembayaran</a>
             </div>
-            @forelse ($pembayaranPending as $p)
-                <a href="{{ route('admin.pembayaran.show', $p) }}" class="d-block text-decoration-none py-2 border-bottom">
-                    <div class="fw-semibold">{{ $p->reservasi->pasien->user->nama_lengkap }}</div>
-                    <div class="small text-muted">{{ $p->reservasi->paket->nama_paket }} &middot; Rp {{ number_format($p->total_bayar, 0, ',', '.') }}</div>
+            @forelse ($menungguBayar as $r)
+                <a href="{{ route('admin.pembayaran.create', ['reservasi' => $r->id]) }}" class="d-block text-decoration-none py-2 border-bottom">
+                    <div class="fw-semibold">{{ $r->pasien?->user?->nama_lengkap ?? '(data pasien tidak ditemukan)' }}</div>
+                    <div class="small text-muted">{{ $r->paket?->nama_paket ?? '-' }} &middot; {{ $r->tanggal_praktik->translatedFormat('d M') }} {{ $r->jam }} &middot; Rp {{ number_format($r->paket?->harga ?? 0, 0, ',', '.') }}</div>
                 </a>
             @empty
-                <p class="text-muted mb-0">Tidak ada pembayaran yang menunggu.</p>
+                <p class="text-muted mb-0">Semua sesi yang selesai sudah dibayar.</p>
             @endforelse
         </div>
     </div>

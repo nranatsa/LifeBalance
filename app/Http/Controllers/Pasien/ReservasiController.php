@@ -56,7 +56,7 @@ class ReservasiController extends Controller
 
     /**
      * Dipanggil kalender (AJAX) setiap kali pasien memilih tanggal.
-     * Mengembalikan terapis & jam yang dipilihkan sistem, atau tersedia=false bila tidak ada.
+     * Mengembalikan daftar terapis yang bisa melayani (opsi pertama = pilihan otomatis), atau tersedia=false.
      */
     public function slot(Request $request): JsonResponse
     {
@@ -71,11 +71,13 @@ class ReservasiController extends Controller
         }
 
         $tanggal = Carbon::createFromFormat('Y-m-d', $data['tanggal'])->startOfDay();
-        $slot = $this->penjadwalan->cariSlotPadaTanggal($paket, $request->user()->pasien, $tanggal);
+        $daftar = $this->penjadwalan->daftarSlotPadaTanggal($paket, $request->user()->pasien, $tanggal);
 
-        if (! $slot) {
+        if (! $daftar) {
             return response()->json([
                 'tersedia' => false,
+                'tanggal_label' => $tanggal->translatedFormat('l, d F Y'),
+                'opsi' => [],
                 'pesan' => 'Tidak ada terapis yang tersedia pada tanggal ini. Silakan pilih tanggal lain.',
             ]);
         }
@@ -83,9 +85,13 @@ class ReservasiController extends Controller
         return response()->json([
             'tersedia' => true,
             'tanggal_label' => $tanggal->translatedFormat('l, d F Y'),
-            'jam' => substr($slot['jam_mulai'], 0, 5).' - '.substr($slot['jam_selesai'], 0, 5),
-            'terapis' => $slot['terapis']->user->nama_lengkap,
-            'spesialisasi' => $slot['terapis']->spesialisasi,
+            // opsi pertama = pilihan otomatis sistem
+            'opsi' => collect($daftar)->map(fn ($k) => [
+                'terapis_id' => $k['terapis_id'],
+                'nama' => $k['terapis']->user->nama_lengkap,
+                'spesialisasi' => $k['terapis']->spesialisasi,
+                'jam' => substr($k['jam_mulai'], 0, 5).' - '.substr($k['jam_selesai'], 0, 5),
+            ])->values(),
         ]);
     }
 
@@ -94,6 +100,7 @@ class ReservasiController extends Controller
         $data = $request->validate([
             'paket_layanan_id' => ['required', 'integer'],
             'tanggal' => ['required', 'date_format:Y-m-d'],
+            'terapis_id' => ['required', 'integer'],
         ]);
 
         $paket = PaketLayanan::published()->find($data['paket_layanan_id']);
@@ -109,13 +116,13 @@ class ReservasiController extends Controller
         }
 
         try {
-            $reservasi = $this->penjadwalan->buatReservasi($request->user()->pasien, $paket, $tanggal);
+            $reservasi = $this->penjadwalan->buatReservasi($request->user()->pasien, $paket, $tanggal, (int) $data['terapis_id']);
         } catch (RuntimeException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
 
         return redirect()->route('pasien.reservasi.show', $reservasi)
-            ->with('success', 'Reservasi dibuat. Silakan lakukan pembayaran agar jadwal Anda terkonfirmasi.');
+            ->with('success', 'Reservasi berhasil. Jadwal Anda sudah terkonfirmasi; pembayaran dilakukan di klinik setelah sesi selesai.');
     }
 
     public function show(Request $request, ReservasiAntrean $reservasi): View
@@ -127,13 +134,16 @@ class ReservasiController extends Controller
         return view('pasien.reservasi.show', compact('reservasi'));
     }
 
-    /** Pembatalan oleh pasien hanya selama belum dibayar. */
+    /** Pasien bisa membatalkan sendiri selama sesi belum dimulai dan tanggalnya bukan hari ini. */
     public function destroy(Request $request, ReservasiAntrean $reservasi): RedirectResponse
     {
         $this->pastikanMilikPasien($request, $reservasi);
 
-        if ($reservasi->status_antrean !== 'menunggu_pembayaran') {
-            return back()->with('error', 'Reservasi yang sudah dibayar hanya dapat dibatalkan melalui admin klinik.');
+        $bisa = in_array($reservasi->status_antrean, ['menunggu_pembayaran', 'terjadwal'], true)
+            && $reservasi->tanggal_praktik->isFuture();
+
+        if (! $bisa) {
+            return back()->with('error', 'Reservasi hanya dapat dibatalkan sendiri paling lambat H-1 sebelum sesi. Hubungi admin klinik untuk pembatalan lainnya.');
         }
 
         $reservasi->update(['status_antrean' => 'batal']);

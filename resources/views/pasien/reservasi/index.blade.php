@@ -24,8 +24,8 @@
                         <tr>
                             <td class="fw-semibold">{{ $r->kode_booking }}</td>
                             <td>{{ $r->tanggal_praktik->translatedFormat('d M Y') }}<br><small class="text-muted">{{ $r->jam }}</small></td>
-                            <td>{{ $r->paket->nama_paket }}</td>
-                            <td>{{ $r->terapis->user->nama_lengkap }}</td>
+                            <td>{{ ($r->paket?->nama_paket ?? '-') }}</td>
+                            <td>{{ ($r->terapis?->user?->nama_lengkap ?? '-') }}</td>
                             <td>#{{ $r->nomor_antrean }}</td>
                             <td>@include('partials.hopewell.status-badge', ['status' => $r->status_antrean])</td>
                             <td class="text-end"><a href="{{ route('pasien.reservasi.show', $r) }}" class="btn btn-sm btn-outline-success">Detail</a></td>

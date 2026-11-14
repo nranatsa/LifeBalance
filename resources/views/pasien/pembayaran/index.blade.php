@@ -6,7 +6,7 @@
 <section class="page-banner">
     <div class="container">
         <h1 class="section-title" style="font-size:clamp(1.8rem,3vw,2.3rem);">Riwayat Pembayaran</h1>
-        <p class="section-sub mb-0">Pembayaran diverifikasi langsung oleh admin klinik.</p>
+        <p class="section-sub mb-0">Pembayaran dicatat langsung oleh admin klinik.</p>
     </div>
 </section>
 
@@ -20,7 +20,7 @@
                     @forelse ($pembayaran as $p)
                         <tr>
                             <td>{{ $p->created_at->translatedFormat('d M Y H:i') }}</td>
-                            <td><a href="{{ route('pasien.reservasi.show', $p->reservasi) }}">{{ $p->reservasi->kode_booking }}</a><br><small class="text-muted">{{ $p->reservasi->paket->nama_paket }}</small></td>
+                            <td><a href="{{ route('pasien.reservasi.show', $p->reservasi_id) }}">{{ $p->reservasi?->kode_booking }}</a><br><small class="text-muted">{{ $p->reservasi?->paket?->nama_paket }}</small></td>
                             <td>{{ ucfirst($p->metode_pembayaran) }}</td>
                             <td>Rp {{ number_format($p->total_bayar, 0, ',', '.') }}</td>
                             <td>@include('partials.hopewell.status-badge', ['status' => $p->status_pembayaran])</td>

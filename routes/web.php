@@ -35,9 +35,10 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::get('pasien/{pasien}', [Admin\PasienController::class, 'show'])->name('pasien.show');
 
     Route::get('pembayaran', [Admin\PembayaranController::class, 'index'])->name('pembayaran.index');
+    Route::get('pembayaran/create', [Admin\PembayaranController::class, 'create'])->name('pembayaran.create');
+    Route::post('pembayaran', [Admin\PembayaranController::class, 'store'])->name('pembayaran.store');
     Route::get('pembayaran/{pembayaran}', [Admin\PembayaranController::class, 'show'])->name('pembayaran.show');
-    Route::patch('pembayaran/{pembayaran}/verifikasi', [Admin\PembayaranController::class, 'verifikasi'])->name('pembayaran.verifikasi');
-    Route::patch('pembayaran/{pembayaran}/tolak', [Admin\PembayaranController::class, 'tolak'])->name('pembayaran.tolak');
+    Route::patch('pembayaran/{pembayaran}/batalkan', [Admin\PembayaranController::class, 'batalkan'])->name('pembayaran.batalkan');
 
     Route::get('antrean', [Admin\AntreanController::class, 'index'])->name('antrean.index');
     Route::get('antrean/{antrean}', [Admin\AntreanController::class, 'show'])->name('antrean.show');
@@ -56,16 +57,12 @@ Route::middleware(['auth', 'role:pasien'])->prefix('pasien')->name('pasien.')->g
         ->only(['index', 'create', 'store', 'show', 'destroy']);
 
     Route::get('pembayaran', [Pasien\PembayaranController::class, 'index'])->name('pembayaran.index');
-    Route::get('reservasi/{reservasi}/pembayaran', [Pasien\PembayaranController::class, 'create'])->name('pembayaran.create');
-    Route::post('reservasi/{reservasi}/pembayaran', [Pasien\PembayaranController::class, 'store'])->name('pembayaran.store');
 });
 
 /* --------------------------------- Terapis -------------------------------- */
 Route::middleware(['auth', 'role:terapis'])->prefix('terapis')->name('terapis.')->group(function () {
     Route::get('jadwal-saya', [Terapis\JadwalSayaController::class, 'index'])->name('jadwal.index');
     Route::get('jadwal-saya/{reservasi}', [Terapis\JadwalSayaController::class, 'show'])->name('jadwal.show');
-    Route::patch('jadwal-saya/{reservasi}/mulai', [Terapis\JadwalSayaController::class, 'mulai'])->name('jadwal.mulai');
-    Route::patch('jadwal-saya/{reservasi}/selesai', [Terapis\JadwalSayaController::class, 'selesai'])->name('jadwal.selesai');
 
     Route::get('profil', [Terapis\ProfilController::class, 'edit'])->name('profil.edit');
     Route::put('profil', [Terapis\ProfilController::class, 'update'])->name('profil.update');

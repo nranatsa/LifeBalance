@@ -33,7 +33,7 @@
                         <tr>
                             <td>{{ $r->tanggal_praktik->translatedFormat('d M Y') }}</td>
                             <td>{{ $r->jam }}</td>
-                            <td>{{ $r->pasien->user->nama_lengkap }}</td>
+                            <td>{{ ($r->pasien?->user?->nama_lengkap ?? '-') }}</td>
                             <td>@include('partials.spark.status-badge', ['status' => $r->status_antrean])</td>
                         </tr>
                     @empty

@@ -12,13 +12,13 @@ use Illuminate\View\View;
 class AntreanController extends Controller
 {
     /**
-     * Status yang boleh dituju ADMIN. Memulai & menyelesaikan sesi (terjadwal -> berlangsung -> selesai)
-     * dilakukan oleh terapis lewat Terapis\JadwalSayaController.
+     * Status sekarang => status yang boleh dituju.
+     * Admin-lah yang menentukan sesi dimulai dan selesai; terapis hanya melihat jadwal.
      */
     protected const TRANSISI = [
-        'menunggu_pembayaran' => ['batal'],
-        'terjadwal' => ['batal'],
-        'berlangsung' => [],
+        'menunggu_pembayaran' => ['terjadwal', 'batal'], // status lama (sebelum pembayaran dipindah ke akhir sesi)
+        'terjadwal' => ['berlangsung', 'batal'],
+        'berlangsung' => ['selesai'],
         'selesai' => [],
         'batal' => [],
     ];

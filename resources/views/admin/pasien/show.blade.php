@@ -30,8 +30,8 @@
                         <tr>
                             <td class="table-order-id"><a href="{{ route('admin.antrean.show', $r) }}">{{ $r->kode_booking }}</a></td>
                             <td>{{ $r->tanggal_praktik->translatedFormat('d M Y') }}<br><small class="text-muted">{{ $r->jam }}</small></td>
-                            <td>{{ $r->paket->nama_paket }}</td>
-                            <td>{{ $r->terapis->user->nama_lengkap }}</td>
+                            <td>{{ ($r->paket?->nama_paket ?? '-') }}</td>
+                            <td>{{ ($r->terapis?->user?->nama_lengkap ?? '-') }}</td>
                             <td>@include('partials.spark.status-badge', ['status' => $r->status_antrean])</td>
                         </tr>
                     @empty

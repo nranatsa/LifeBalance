@@ -5,18 +5,17 @@ namespace App\Http\Controllers\Terapis;
 use App\Http\Controllers\Controller;
 use App\Models\JadwalPraktikTerapis;
 use App\Models\ReservasiAntrean;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
- * Jadwal dibuat otomatis oleh sistem; terapis tidak bisa mengubah jadwal.
- * Hanya reservasi yang sudah dibayar (terjadwal / berlangsung / selesai) yang ditampilkan.
- * Terapis-lah yang mengonfirmasi sesi dimulai dan selesai.
+ * Terapis hanya MELIHAT jadwal yang dibuat otomatis oleh sistem.
+ * Status sesi (berlangsung / selesai) ditentukan oleh admin.
+ * Jadwal tampil sejak reservasi dibuat, tanpa menunggu pembayaran (pembayaran dilakukan setelah sesi selesai).
  */
 class JadwalSayaController extends Controller
 {
-    protected const STATUS_TAMPIL = ['terjadwal', 'berlangsung', 'selesai'];
+    protected const STATUS_TAMPIL = ['menunggu_pembayaran', 'terjadwal', 'berlangsung', 'selesai'];
 
     public function index(Request $request): View
     {
@@ -55,54 +54,5 @@ class JadwalSayaController extends Controller
         $reservasi->load(['pasien.user', 'paket']);
 
         return view('terapis.jadwal.show', compact('reservasi'));
-    }
-
-    /** terjadwal -> berlangsung */
-    public function mulai(Request $request, ReservasiAntrean $reservasi): RedirectResponse
-    {
-        $this->pastikanMilikTerapis($request, $reservasi);
-
-        if ($reservasi->status_antrean !== 'terjadwal') {
-            return back()->with('error', 'Hanya sesi berstatus Terjadwal yang bisa dimulai.');
-        }
-
-        if ($pesan = $this->belumWaktunya($reservasi)) {
-            return back()->with('error', $pesan);
-        }
-
-        $reservasi->update(['status_antrean' => 'berlangsung']);
-
-        return back()->with('success', 'Sesi dimulai.');
-    }
-
-    /** terjadwal / berlangsung -> selesai */
-    public function selesai(Request $request, ReservasiAntrean $reservasi): RedirectResponse
-    {
-        $this->pastikanMilikTerapis($request, $reservasi);
-
-        if (! in_array($reservasi->status_antrean, ['terjadwal', 'berlangsung'], true)) {
-            return back()->with('error', 'Sesi ini tidak bisa ditandai selesai.');
-        }
-
-        if ($pesan = $this->belumWaktunya($reservasi)) {
-            return back()->with('error', $pesan);
-        }
-
-        $reservasi->update(['status_antrean' => 'selesai']);
-
-        return back()->with('success', 'Sesi ditandai selesai.');
-    }
-
-    protected function pastikanMilikTerapis(Request $request, ReservasiAntrean $reservasi): void
-    {
-        abort_unless($reservasi->terapis_id === $request->user()->terapis->id, 404);
-    }
-
-    /** Sesi tanggal mendatang belum boleh dimulai/diselesaikan. */
-    protected function belumWaktunya(ReservasiAntrean $reservasi): ?string
-    {
-        return $reservasi->tanggal_praktik->isFuture()
-            ? 'Sesi ini dijadwalkan pada '.$reservasi->tanggal_praktik->translatedFormat('d F Y').' dan belum bisa diubah statusnya.'
-            : null;
     }
 }

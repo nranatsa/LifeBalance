@@ -43,22 +43,33 @@ class ReservasiAntrean extends Model
 
     public function pasien(): BelongsTo
     {
-        return $this->belongsTo(Pasien::class, 'pasien_id');
+        return $this->belongsTo(Pasien::class, 'pasien_id')->withDefault();
     }
 
     public function paket(): BelongsTo
     {
-        return $this->belongsTo(PaketLayanan::class, 'paket_layanan_id');
+        return $this->belongsTo(PaketLayanan::class, 'paket_layanan_id')->withDefault(['nama_paket' => '(paket dihapus)', 'harga' => 0, 'durasi_menit' => 0]);
     }
 
     public function terapis(): BelongsTo
     {
-        return $this->belongsTo(Terapis::class, 'terapis_id');
+        return $this->belongsTo(Terapis::class, 'terapis_id')->withDefault();
     }
 
     public function pembayaran(): HasOne
     {
         return $this->hasOne(Pembayaran::class, 'reservasi_id')->latestOfMany();
+    }
+
+    public function pembayaranLunas(): HasOne
+    {
+        return $this->hasOne(Pembayaran::class, 'reservasi_id')->where('status_pembayaran', 'lunas');
+    }
+
+    /** Sesi sudah selesai tetapi belum ada pembayaran lunas. */
+    public function scopeBelumDibayar($query)
+    {
+        return $query->where('status_antrean', 'selesai')->whereDoesntHave('pembayaranLunas');
     }
 
     public function scopeAktif($query)
@@ -73,6 +84,6 @@ class ReservasiAntrean extends Model
 
     public function getJamAttribute(): string
     {
-        return substr($this->jam_mulai, 0, 5).' - '.substr($this->jam_selesai, 0, 5);
+        return substr($this->jam_mulai ?? '', 0, 5).' - '.substr($this->jam_selesai ?? '', 0, 5);
     }
 }

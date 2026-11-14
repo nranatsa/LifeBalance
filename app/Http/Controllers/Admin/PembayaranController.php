@@ -4,13 +4,15 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Pembayaran;
+use App\Models\ReservasiAntrean;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 /**
- * Pembayaran hanya melibatkan pasien dan admin. Terapis tidak punya akses.
+ * Seluruh pembayaran dikelola admin. Pasien membayar langsung ke klinik SETELAH sesi selesai,
+ * lalu admin mencatatnya di sini. Pencatatan pembayaran tidak mengubah status antrean.
  */
 class PembayaranController extends Controller
 {
@@ -22,7 +24,60 @@ class PembayaranController extends Controller
             ->paginate(10)
             ->withQueryString();
 
-        return view('admin.pembayaran.index', compact('pembayaran'));
+        $menungguBayar = ReservasiAntrean::belumDibayar()->count();
+
+        return view('admin.pembayaran.index', compact('pembayaran', 'menungguBayar'));
+    }
+
+    public function create(Request $request): View
+    {
+        $menunggu = ReservasiAntrean::with(['pasien.user', 'paket'])
+            ->belumDibayar()
+            ->orderBy('tanggal_praktik')
+            ->orderBy('jam_mulai')
+            ->get();
+
+        $terpilih = $menunggu->firstWhere('id', $request->integer('reservasi'));
+
+        return view('admin.pembayaran.create', compact('menunggu', 'terpilih'));
+    }
+
+    public function store(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'reservasi_id' => ['required', 'integer', 'exists:reservasi_antrean,id'],
+            'metode_pembayaran' => ['required', 'in:transfer,tunai,qris'],
+            'total_bayar' => ['required', 'numeric', 'min:0'],
+            'bukti_pembayaran' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:4096'],
+        ]);
+
+        $pembayaran = DB::transaction(function () use ($request, $data) {
+            $reservasi = ReservasiAntrean::whereKey($data['reservasi_id'])->lockForUpdate()->first();
+
+            // pembayaran hanya untuk sesi yang sudah selesai dan belum lunas
+            if ($reservasi->status_antrean !== 'selesai' || $reservasi->pembayaranLunas()->exists()) {
+                return null;
+            }
+
+            return Pembayaran::create([
+                'reservasi_id' => $reservasi->id,
+                'total_bayar' => $data['total_bayar'],
+                'metode_pembayaran' => $data['metode_pembayaran'],
+                'bukti_pembayaran' => $request->hasFile('bukti_pembayaran')
+                    ? $request->file('bukti_pembayaran')->store('bukti-pembayaran', 'public')
+                    : null,
+                'status_pembayaran' => 'lunas',
+                'diverifikasi_oleh' => $request->user()->id,
+                'tanggal_bayar' => now(),
+            ]);
+        });
+
+        if (! $pembayaran) {
+            return back()->withInput()->with('error', 'Pembayaran hanya bisa dicatat untuk sesi yang sudah selesai dan belum dibayar.');
+        }
+
+        return redirect()->route('admin.pembayaran.show', $pembayaran)
+            ->with('success', 'Pembayaran dicatat sebagai lunas.');
     }
 
     public function show(Pembayaran $pembayaran): View
@@ -32,33 +87,11 @@ class PembayaranController extends Controller
         return view('admin.pembayaran.show', compact('pembayaran'));
     }
 
-    public function verifikasi(Request $request, Pembayaran $pembayaran): RedirectResponse
+    /** Membatalkan pembayaran yang salah catat. Reservasi kembali tercatat belum dibayar. */
+    public function batalkan(Request $request, Pembayaran $pembayaran): RedirectResponse
     {
-        if ($pembayaran->status_pembayaran !== 'pending') {
-            return back()->with('error', 'Pembayaran ini sudah diproses.');
-        }
-
-        DB::transaction(function () use ($request, $pembayaran) {
-            $pembayaran->update([
-                'status_pembayaran' => 'lunas',
-                'diverifikasi_oleh' => $request->user()->id,
-                'tanggal_bayar' => now(),
-            ]);
-
-            $reservasi = $pembayaran->reservasi;
-            if ($reservasi->status_antrean === 'menunggu_pembayaran') {
-                $reservasi->update(['status_antrean' => 'terjadwal']);
-            }
-        });
-
-        return redirect()->route('admin.pembayaran.index')
-            ->with('success', 'Pembayaran diverifikasi. Reservasi pasien kini berstatus terjadwal.');
-    }
-
-    public function tolak(Request $request, Pembayaran $pembayaran): RedirectResponse
-    {
-        if ($pembayaran->status_pembayaran !== 'pending') {
-            return back()->with('error', 'Pembayaran ini sudah diproses.');
+        if ($pembayaran->status_pembayaran !== 'lunas') {
+            return back()->with('error', 'Pembayaran ini sudah dibatalkan.');
         }
 
         $pembayaran->update([
@@ -66,7 +99,6 @@ class PembayaranController extends Controller
             'diverifikasi_oleh' => $request->user()->id,
         ]);
 
-        return redirect()->route('admin.pembayaran.index')
-            ->with('success', 'Pembayaran ditolak. Pasien dapat mengunggah bukti pembayaran kembali.');
+        return back()->with('success', 'Pembayaran dibatalkan. Sesi ini kembali tercatat belum dibayar.');
     }
 }

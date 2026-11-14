@@ -21,7 +21,7 @@ class DashboardController extends Controller
             'terapis' => Terapis::aktif()->count(),
             'paket' => PaketLayanan::published()->count(),
             'antrean_hari_ini' => ReservasiAntrean::aktif()->whereDate('tanggal_praktik', $hariIni)->count(),
-            'pembayaran_pending' => Pembayaran::where('status_pembayaran', 'pending')->count(),
+            'belum_dibayar' => ReservasiAntrean::belumDibayar()->count(),
             'pendapatan_bulan_ini' => Pembayaran::where('status_pembayaran', 'lunas')
                 ->whereYear('tanggal_bayar', now()->year)
                 ->whereMonth('tanggal_bayar', now()->month)
@@ -34,12 +34,12 @@ class DashboardController extends Controller
             ->orderBy('jam_mulai')
             ->get();
 
-        $pembayaranPending = Pembayaran::with('reservasi.pasien.user', 'reservasi.paket')
-            ->where('status_pembayaran', 'pending')
-            ->latest()
+        $menungguBayar = ReservasiAntrean::with(['pasien.user', 'paket'])
+            ->belumDibayar()
+            ->orderBy('tanggal_praktik')
             ->limit(5)
             ->get();
 
-        return view('admin.dashboard', compact('stat', 'antreanHariIni', 'pembayaranPending'));
+        return view('admin.dashboard', compact('stat', 'antreanHariIni', 'menungguBayar'));
     }
 }

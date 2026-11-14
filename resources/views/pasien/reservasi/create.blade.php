@@ -19,7 +19,7 @@
 <section class="page-banner">
     <div class="container">
         <h1 class="section-title" style="font-size:clamp(1.8rem,3vw,2.3rem);">Buat Reservasi</h1>
-        <p class="section-sub mb-0">Pilih paket, lalu pilih tanggal. Terapis yang bisa melayani muncul otomatis.</p>
+        <p class="section-sub mb-0">Pilih paket, lalu pilih tanggal. Terapis yang bisa melayani muncul otomatis dan bisa Anda pilih.</p>
     </div>
 </section>
 
@@ -74,8 +74,10 @@
                                         <input type="text" class="form-control" id="tanggal-label" placeholder="Belum dipilih" readonly>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label fw-semibold">Terapis</label>
-                                        <input type="text" class="form-control" id="terapis" placeholder="Pilih tanggal terlebih dahulu" readonly>
+                                        <label class="form-label fw-semibold" for="terapis_id">Terapis</label>
+                                        <select name="terapis_id" id="terapis_id" class="form-select" required disabled>
+                                            <option value="">Pilih tanggal terlebih dahulu</option>
+                                        </select>
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label fw-semibold">Jam</label>
@@ -127,20 +129,43 @@
 
     const elTanggal = document.getElementById('tanggal');
     const elLabel   = document.getElementById('tanggal-label');
-    const elTerapis = document.getElementById('terapis');
+    const elTerapis = document.getElementById('terapis_id');
     const elJam     = document.getElementById('jam');
     const elInfo    = document.getElementById('slot-info');
     const btn       = document.getElementById('btn-submit');
     let permintaan  = 0;
+    let opsiSaatIni = [];
+
+    function isiDropdown(teks, opsi) {
+        elTerapis.innerHTML = '';
+        const first = document.createElement('option');
+        first.value = '';
+        first.textContent = teks;
+        elTerapis.appendChild(first);
+        opsi.forEach(function (o, i) {
+            const el = document.createElement('option');
+            el.value = o.terapis_id;
+            el.textContent = o.nama + (o.spesialisasi ? ' - ' + o.spesialisasi : '') + (i === 0 ? ' (disarankan)' : '');
+            elTerapis.appendChild(el);
+        });
+    }
 
     function reset(pesan, kelas) {
-        elTerapis.value = '';
+        opsiSaatIni = [];
+        isiDropdown(kelas === 'none' ? 'Tidak ada terapis tersedia' : 'Pilih tanggal terlebih dahulu', []);
+        elTerapis.disabled = true;
         elJam.value = '';
-        elTerapis.placeholder = kelas === 'none' ? 'Tidak ada terapis tersedia' : 'Pilih tanggal terlebih dahulu';
         elInfo.className = 'slot-box mb-3 small ' + (kelas || '');
         elInfo.textContent = pesan;
         btn.disabled = true;
     }
+
+    function pilihTerapis() {
+        const o = opsiSaatIni.find(function (x) { return String(x.terapis_id) === elTerapis.value; });
+        elJam.value = o ? o.jam : '';
+        btn.disabled = !o;
+    }
+    elTerapis.addEventListener('change', pilihTerapis);
 
     function cekTanggal(dateStr) {
         const nomor = ++permintaan;
@@ -155,14 +180,16 @@
         .then(({ ok, j }) => {
             if (nomor !== permintaan) return;           // abaikan respons usang
             if (!ok) { reset(j.pesan || 'Tanggal tidak valid.', 'none'); return; }
-            if (!j.tersedia) { reset(j.pesan, 'none'); return; }
+            if (!j.tersedia || !j.opsi.length) { reset(j.pesan, 'none'); return; }
 
             elLabel.value = j.tanggal_label;
-            elTerapis.value = j.terapis;
-            elJam.value = j.jam;
+            opsiSaatIni = j.opsi;
+            isiDropdown('Pilih terapis', j.opsi);
+            elTerapis.disabled = false;
+            elTerapis.value = String(j.opsi[0].terapis_id);   // pilihan otomatis sistem
+            pilihTerapis();
             elInfo.className = 'slot-box ok mb-3 small';
-            elInfo.textContent = 'Terapis tersedia' + (j.spesialisasi ? ' (' + j.spesialisasi + ')' : '') + '. Jadwal final ditetapkan saat Anda mengonfirmasi.';
-            btn.disabled = false;
+            elInfo.textContent = j.opsi.length + ' terapis tersedia. Terapis disarankan sudah dipilih otomatis, Anda bisa menggantinya. Jadwal final ditetapkan saat konfirmasi.';
         })
         .catch(() => { if (nomor === permintaan) reset('Gagal memeriksa ketersediaan. Coba pilih tanggal lagi.', 'none'); });
     }

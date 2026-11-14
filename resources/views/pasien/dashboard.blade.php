@@ -21,12 +21,12 @@
                     <a href="{{ route('pasien.reservasi.show', $r) }}" class="text-decoration-none">
                         <div class="hw-panel h-100">
                             <div class="d-flex justify-content-between align-items-start mb-2">
-                                <strong class="text-dark">{{ $r->paket->nama_paket }}</strong>
+                                <strong class="text-dark">{{ ($r->paket?->nama_paket ?? '-') }}</strong>
                                 @include('partials.hopewell.status-badge', ['status' => $r->status_antrean])
                             </div>
                             <div class="text-muted small"><i class="bi bi-calendar-event"></i> {{ $r->tanggal_praktik->translatedFormat('l, d F Y') }}</div>
                             <div class="text-muted small"><i class="bi bi-clock"></i> {{ $r->jam }}</div>
-                            <div class="text-muted small"><i class="bi bi-person-heart"></i> {{ $r->terapis->user->nama_lengkap }}</div>
+                            <div class="text-muted small"><i class="bi bi-person-heart"></i> {{ ($r->terapis?->user?->nama_lengkap ?? '-') }}</div>
                             <div class="text-muted small"><i class="bi bi-hash"></i> Antrean {{ $r->nomor_antrean }}</div>
                         </div>
                     </a>

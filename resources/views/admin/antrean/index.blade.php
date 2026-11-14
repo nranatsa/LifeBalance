@@ -44,9 +44,9 @@
                     <td class="table-order-id">#{{ $r->nomor_antrean }}</td>
                     <td>{{ $r->tanggal_praktik->translatedFormat('d M Y') }}<br><small class="text-muted">{{ $r->jam }}</small></td>
                     <td>{{ $r->kode_booking }}</td>
-                    <td>{{ $r->pasien->user->nama_lengkap }}</td>
-                    <td>{{ $r->paket->nama_paket }}</td>
-                    <td>{{ $r->terapis->user->nama_lengkap }}</td>
+                    <td>{{ ($r->pasien?->user?->nama_lengkap ?? '-') }}</td>
+                    <td>{{ ($r->paket?->nama_paket ?? '-') }}</td>
+                    <td>{{ ($r->terapis?->user?->nama_lengkap ?? '-') }}</td>
                     <td>
                         @if ($r->pembayaran)
                             @include('partials.spark.status-badge', ['status' => $r->pembayaran->status_pembayaran])

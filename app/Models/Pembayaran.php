@@ -24,7 +24,7 @@ class Pembayaran extends Model
 
     public function reservasi(): BelongsTo
     {
-        return $this->belongsTo(ReservasiAntrean::class, 'reservasi_id');
+        return $this->belongsTo(ReservasiAntrean::class, 'reservasi_id')->withDefault();
     }
 
     public function verifikator(): BelongsTo

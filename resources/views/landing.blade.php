@@ -125,8 +125,8 @@
                 </div>
                 <div class="col-md-4 hiw-step" data-aos="fade-up" data-aos-delay="240">
                     <div class="hiw-num">3</div>
-                    <h5 class="font-display fw-bold">Bayar &amp; Datang</h5>
-                    <p class="text-muted">Selesaikan pembayaran ke admin klinik. Setelah terverifikasi, jadwal Anda terkonfirmasi.</p>
+                    <h5 class="font-display fw-bold">Datang &amp; Bayar Setelah Sesi</h5>
+                    <p class="text-muted">Jadwal langsung terkonfirmasi. Datang sesuai jadwal, dan pembayaran dilakukan di klinik setelah sesi selesai.</p>
                 </div>
             </div>
         </div>
